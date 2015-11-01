@@ -1,9 +1,5 @@
-#![feature(iter_arith)]
-#![feature(scoped)]
-
 #![deny(warnings)]
-#![allow(deprecated)] // thread::scoped needs to go, but can't do it now
-#![feature(plugin)]
+#![allow(deprecated)]
 
 extern crate regex;
 extern crate rustc_serialize;
@@ -21,18 +17,21 @@ mod playpen;
 fn main() {
     let examples = Example::get_list();
     let (tx, rx) = mpsc::channel();
+    let mut children = vec![];
 
     let mut nexamples = 0;
     for (i, example) in examples.into_iter().enumerate() {
         let tx = tx.clone();
         let count = example.count();
 
-        let _ = thread::scoped(move || {
+        children.push(thread::spawn(move || {
             example.process(vec!(i + 1), tx, 0, String::new());
-        });
+        }));
 
         nexamples += count;
     }
+
+    for child in children { let _ = child.join(); }
 
     let mut entries = (0..nexamples).map(|_| {
         rx.recv().unwrap()
